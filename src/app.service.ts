@@ -8,8 +8,8 @@ import {
   AnswerOption,
   GenerateContentResponse,
   GenerateContentV2Content,
-  GeneratedContent,
-  GeneratedContentData,
+  SavedGeneratedContent,
+  SavedGeneratedContentData,
 } from './interfaces';
 import {
   CONTINUE_CONVERSATION_MUTATION,
@@ -41,7 +41,7 @@ export class AppService {
       __dirname,
       '../scripts/generated-content.json',
     );
-    const generatedContentList: GeneratedContent[] = JSON.parse(
+    const generatedContentList: SavedGeneratedContent[] = JSON.parse(
       readFileSync(generatedContentPath, 'utf8'),
     );
     const headers: string[] = [
@@ -66,7 +66,7 @@ export class AppService {
       });
     }
     for (let i = 0; i < generatedContentList.length; i++) {
-      const generatedContent: GeneratedContent = generatedContentList[i];
+      const generatedContent: SavedGeneratedContent = generatedContentList[i];
       const gradeMatch: RegExpMatchArray | null = generatedContent.standard.match(/(\d+)/);
       const gradeNumber: string = gradeMatch ? gradeMatch[0] : 'Unknown';
       const row = worksheet.getRow(i + 2);
@@ -76,7 +76,7 @@ export class AppService {
       if (rowExists) {
         continue;
       }
-      const generatedContentData: GeneratedContentData = JSON.parse(
+      const generatedContentData: SavedGeneratedContentData = JSON.parse(
         generatedContent.content,
       );
       const graphqlUrl: string = process.env.GRAPHQL_URL;
@@ -125,7 +125,7 @@ export class AppService {
   }
 
   private async startConversation(
-    generatedContent: GeneratedContent,
+    generatedContent: SavedGeneratedContent,
     userInteractionHistory: string,
     graphqlUrl: string,
     graphqlIdToken: string,
@@ -143,7 +143,7 @@ export class AppService {
   }
 
   private async continueConversation(
-    generatedContent: GeneratedContent,
+    generatedContent: SavedGeneratedContent,
     userInteractionHistory: string,
     userMessage: string,
     graphqlUrl: string,

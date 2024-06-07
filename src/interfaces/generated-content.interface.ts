@@ -1,10 +1,10 @@
-export interface GeneratedContent {
+export interface SavedGeneratedContent {
   id: string;
   standard: string;
   content: string;
 }
 
-export interface GeneratedContentData {
+export interface SavedGeneratedContentData {
   question: string;
   answer_options: AnswerOption[];
 }
