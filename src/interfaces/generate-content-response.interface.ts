@@ -2,6 +2,7 @@ import { timestamp } from "rxjs";
 
 export interface GenerateContentResponse {
   data: GenerateContentResponseData;
+  errors?: unknown[];
 }
 
 export interface GenerateContentResponseData {

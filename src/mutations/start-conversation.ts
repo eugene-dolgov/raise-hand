@@ -11,17 +11,6 @@ export const START_CONVERSATION_MUTATION = `mutation ChatWithFigure {
       contentGeneratorId: "Tutor Conversation - Text Message - Initial"
     }
   ) {
-    attributes {
-      attributeName
-      attributeValue
-    }
-    extendedAttributes {
-      platformId
-      value
-    }
-    generatedContentId
-    contentTypeName
-    contentTypeId
     content
   }
-}`
+}`;

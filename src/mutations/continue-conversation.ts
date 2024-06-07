@@ -12,17 +12,6 @@ export const CONTINUE_CONVERSATION_MUTATION = `mutation ChatWithFigure {
       contentGeneratorId: "Tutor Conversation - Text Message - Continuing"
     }
   ) {
-    attributes {
-      attributeName
-      attributeValue
-    }
-    extendedAttributes {
-      platformId
-      value
-    }
-    generatedContentId
-    contentTypeName
-    contentTypeId
     content
   }
 }`;

@@ -1,7 +1,8 @@
 import { HttpService } from '@nestjs/axios';
-import { AxiosResponse } from 'axios';
 import { Injectable } from '@nestjs/common';
-import { createWriteStream, readFileSync } from 'fs';
+import { AxiosError, AxiosResponse } from 'axios';
+import * as ExcelJS from 'exceljs';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 import {
   AnswerOption,
@@ -15,7 +16,6 @@ import {
   START_CONVERSATION_MUTATION,
   USER_INTERACTION_HISTORY,
 } from './mutations';
-import * as ExcelJS from 'exceljs';
 
 const USER_MESSAGES: string[] = [
   'Can you assist me in solving this?',
@@ -45,6 +45,8 @@ export class AppService {
       readFileSync(generatedContentPath, 'utf8'),
     );
     const headers: string[] = [
+      'grade',
+      'standard',
       'generatedContentId',
       'generatedContent',
       'selectedOption',
@@ -65,7 +67,12 @@ export class AppService {
     }
     for (let i = 0; i < generatedContentList.length; i++) {
       const generatedContent: GeneratedContent = generatedContentList[i];
-      const rowExists: boolean = worksheet.getRow(i + 2).getCell(1).value === generatedContent.id;
+      const gradeMatch: RegExpMatchArray | null = generatedContent.standard.match(/(\d+)/);
+      const gradeNumber: string = gradeMatch ? gradeMatch[0] : 'Unknown';
+      const row = worksheet.getRow(i + 2);
+      const idCell = row.getCell(3);
+      const secondResponseCell = row.getCell(8);
+      const rowExists: boolean = idCell.value === generatedContent.id && !!secondResponseCell.value;
       if (rowExists) {
         continue;
       }
@@ -102,15 +109,18 @@ export class AppService {
         graphqlIdToken,
       );
       const rowValues = [
+        gradeNumber,
+        generatedContent.standard,
         generatedContent.id,
-        JSON.stringify(generatedContent, null, 2),
-        selectedOption ? selectedOption.answer : '-',
+        JSON.stringify(generatedContentData, null, 2),
+        selectedOption ? `${selectedOption.id}) ${selectedOption.answer}` : '-',
         initialResponse,
         userMessage,
         secondResponse,
       ];
-      worksheet.addRow(rowValues);
+      worksheet.insertRow(i + 2, rowValues);
       await workbook.xlsx.writeFile('output.xlsx');
+      console.log(`Processed ${i + 1} / ${generatedContentList.length}`);
     }
   }
 
@@ -129,19 +139,7 @@ export class AppService {
       '{{userInteractionHistory}}',
       userInteractionHistory,
     );
-    const response: AxiosResponse<GenerateContentResponse> =
-      await this.httpService
-        .post(
-          graphqlUrl,
-          { query: graphqlQuery },
-          { headers: { 'x-api-key': graphqlIdToken } },
-        )
-        .toPromise();
-
-    const responseContent: GenerateContentV2Content = JSON.parse(
-      response.data.data.generateContentV2.content,
-    );
-    return responseContent.figureResponse.content;
+    return this.request(graphqlUrl, graphqlIdToken, graphqlQuery);
   }
 
   private async continueConversation(
@@ -159,18 +157,35 @@ export class AppService {
       '{{userInteractionHistory}}',
       userInteractionHistory,
     );
-    const response: AxiosResponse<GenerateContentResponse> =
-      await this.httpService
-        .post(
-          graphqlUrl,
-          { query: graphqlQuery },
-          { headers: { 'x-api-key': graphqlIdToken } },
-        )
-        .toPromise();
+    return this.request(graphqlUrl, graphqlIdToken, graphqlQuery);
+  }
 
-    const responseContent: GenerateContentV2Content = JSON.parse(
-      response.data.data.generateContentV2.content,
-    );
-    return responseContent.figureResponse.content;
+  private async request(graphqlUrl: string, graphqlIdToken: string, graphqlQuery: string): Promise<string> {
+    try {
+      const response: AxiosResponse<GenerateContentResponse> =
+        await this.httpService
+          .post(
+            graphqlUrl,
+            { query: graphqlQuery },
+            { headers: { 'Authorization': graphqlIdToken } },
+          )
+          .toPromise();
+      
+      if (response.data.errors) {
+        throw response.data.errors;
+      }
+
+      const responseContent: GenerateContentV2Content = JSON.parse(
+        response.data.data.generateContentV2.content,
+      );
+      return responseContent.figureResponse.content;
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        console.error(error.response?.data);
+      } else {
+        console.error(error);
+      }
+      throw error;
+    }
   }
 }
