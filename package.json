@@ -16,12 +16,17 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/jest/bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "python": "cd ./scripts && python3 -m venv venv && if-env OS=Windows_NT && venv\\Scripts\\python -m pip install -r requirements.txt || venv/bin/python -m pip install -r requirements.txt",
+    "script": "cd ./scripts && source ./venv/bin/activate && python3 script.py && deactivate"
   },
   "dependencies": {
+    "@nestjs/axios": "^3.0.2",
     "@nestjs/common": "^10.3.2",
     "@nestjs/core": "^10.3.2",
     "@nestjs/platform-express": "^10.3.2",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
     "reflect-metadata": "^0.2.1",
     "rxjs": "^7.8.1"
   },
