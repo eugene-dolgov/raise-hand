@@ -92,6 +92,11 @@ export class AppService {
           '{{selectedOption}}',
           selectedOption.answer,
         );
+      } else {
+        userInteractionHistory = USER_INTERACTION_HISTORY.replace(
+          '{{selectedOption}}',
+          '',
+        );
       }
       const initialResponse: string = await this.startConversation(
         generatedContent,
