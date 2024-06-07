@@ -44,6 +44,25 @@ export class AppService {
     const generatedContentList: GeneratedContent[] = JSON.parse(
       readFileSync(generatedContentPath, 'utf8'),
     );
+    const headers: string[] = [
+      'generatedContentId',
+      'generatedContent',
+      'selectedOption',
+      'initialResponse',
+      'userMessage',
+      'secondResponse',
+    ];
+    let workbook = new ExcelJS.Workbook();
+    let worksheet: ExcelJS.Worksheet;
+    try {
+      workbook = await workbook.xlsx.readFile('output.xlsx');
+      worksheet = workbook.getWorksheet('Responses');
+    } catch (error) {
+      worksheet = workbook.addWorksheet('Responses');
+      headers.forEach((header, index) => {
+        worksheet.getCell(1, index + 1).value = header;
+      });
+    }
     for (let i = 0; i < generatedContentList.length; i++) {
       const generatedContent: GeneratedContent = generatedContentList[i];
       const generatedContentData: GeneratedContentData = JSON.parse(
@@ -78,19 +97,6 @@ export class AppService {
         graphqlUrl,
         graphqlIdToken,
       );
-      const headers: string[] = [
-        'generatedContentId',
-        'generatedContent',
-        'selectedOption',
-        'initialResponse',
-        'userMessage',
-        'secondResponse',
-      ];
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Responses');
-      headers.forEach((header, index) => {
-        worksheet.getCell(1, index + 1).value = header;
-      });
       const rowValues = [
         generatedContent.id,
         JSON.stringify(generatedContent, null, 2),

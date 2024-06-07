@@ -2,7 +2,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 # Create a connection to the database
-engine = create_engine('mysql+pymysql://XXX:XXX@coachbot-prod-db.rp.devfactory.com/alphacoachbot')
+engine = create_engine('mysql+pymysql://XXX:YYY@coachbot-prod-db.rp.devfactory.com/alphacoachbot')
 
 # Execute the query and save to JSON
 df = pd.read_sql("""SELECT cgc.id, s.external_id AS standard, cgc.content 
