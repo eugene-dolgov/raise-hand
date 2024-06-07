@@ -1,0 +1,266 @@
+import { GenerateContentInput, GeneratedContent } from '../../../lib/models/contentGeneratorTypes';
+import { ConfigurationService } from '../../../lib/services/configurationService';
+// Do not switch the import folder to the whole services (services/index), as graphqlresolver will fail due to unmet dependency on sharp, at runtime
+// noinspection ES6PreferShortImport
+import { GeneratedContentService } from '../../../lib/content-generator/services/src/generated-content-service';
+import { getCoachbotLogger } from '../../../lib/core/src/utilities';
+import { ResolverInput } from './models/resolverInput';
+import { GenerateContentGraphQLInput, GenerateContentInputGraphQLSchema } from './schemas/generate-content';
+import { PrefillService } from '../../../lib/content-generator/services/src/prefill-service';
+
+import * as ExcelJS from 'exceljs';
+import { join } from 'path';
+import { readFileSync } from 'fs';
+import {
+  AnswerOption,
+  SavedGeneratedContent,
+  SavedGeneratedContentData,
+} from './interfaces';
+
+const logger = getCoachbotLogger('generateContentV2');
+
+/**
+ * Returns pre-generated content and/or triggers further generation of content to be served
+ * @param event Details about the type of content to retrieve and/or generate
+ * @returns {Promise<GeneratedContent>} The generated content
+ */
+export default async function generateContentV2(
+  event: ResolverInput<GenerateContentGraphQLInput>
+): Promise<GeneratedContent> {
+  // return await generateContentV2Impl(event, false);
+  return await start();
+}
+
+async function start(): Promise<GeneratedContent> {
+  const eventData = {
+    typeName : 'Mutation',
+    fieldName : 'generateContentV2',
+    arguments : {
+      input : {
+        attributes: [],
+        extendedAttributes: [{ platformId: 'd7ff5012-d689-4a84-8aa6-012b63fa0783' }],
+        subject: 'Math',
+        isSyncGeneration: true,
+        contentTypeId: 'DMs from the Dead v2 - Text Message',
+        contentGeneratorId: 'Tutor Conversation - Text Message - Initial'
+      }
+    },
+    identity : {
+      claims: {
+        'custom:role': 'Student',
+        'custom:userID': 'c9b595ae-db50-11eb-81cb-976ec8547a05',
+        'custom:studentID': 'c9b595ae-db50-11eb-81cb-976ec8547a05'
+      }
+    }
+  };  
+
+  const generateResponse = async (
+    generatedContent: SavedGeneratedContent,
+    selectedOption?: AnswerOption,
+    userMessage?: string,
+  ): Promise<string> => {
+    const event = JSON.parse(JSON.stringify(eventData));
+    if (userMessage) {
+      event.arguments.input.contentGeneratorId = 'Tutor Conversation - Text Message - Continuing';
+      event.arguments.input.attributes.push({
+        attributeName: 'userMessage',
+        attributeValue: userMessage
+      });
+    }
+    event.arguments.input.attributes.push({
+      attributeName: 'generatedContentId',
+      attributeValue: generatedContent.id
+    });
+    if (selectedOption) {
+      event.arguments.input.attributes.push({
+        attributeName: 'userInteractionHistory',
+        attributeValue: JSON.stringify({
+          interactions: [
+            {
+              selectedOption: selectedOption.answer,
+              correct: selectedOption.correct
+            }
+          ]
+        })
+      });
+    }
+    const response: GeneratedContent = await generateContentV2Impl(event, false)
+    return (response.content.figureResponse as Record<string, string>).content;
+  }
+
+  const USER_MESSAGES: string[] = [
+    'Can you assist me in solving this?',
+    'Could you guide me through this math problem to find the correct answer?',
+    'I need help understanding this math question, can you explain it?',
+    'What steps should I follow to solve this math problem?',
+    'Can you break down this math problem for me?',
+    "I'm stuck on this math question, can you help?",
+    'Could you provide a detailed explanation for this math problem?',
+    'What is the best approach to solve this math question?',
+    'Can you walk me through the solution to this math problem?',
+    'How do I find the correct answer to this math question?',
+    'What is correct answer to this question?',
+    'Suggest please correct answer to this question',
+  ];
+  const generatedContentPath: string = join(
+    __dirname,
+    'generated-content.json',
+  );
+  const generatedContentList: SavedGeneratedContent[] = JSON.parse(
+    readFileSync(generatedContentPath, 'utf8'),
+  );
+  const headers: string[] = [
+    'grade',
+    'standard',
+    'generatedContentId',
+    'generatedContent',
+    'selectedOption',
+    'initialResponse',
+    'userMessage',
+    'secondResponse',
+  ];
+  let workbook = new ExcelJS.Workbook();
+  let worksheet: ExcelJS.Worksheet;
+  try {
+    workbook = await workbook.xlsx.readFile('generate-content-output.xlsx');
+    worksheet = workbook.getWorksheet('Responses');
+  } catch (error) {
+    worksheet = workbook.addWorksheet('Responses');
+    headers.forEach((header, index) => {
+      worksheet.getCell(1, index + 1).value = header;
+    });
+  }
+  for (let i = 0; i < generatedContentList.length; i++) {
+    const generatedContent: SavedGeneratedContent = generatedContentList[i];
+    const gradeMatch: RegExpMatchArray | null = generatedContent.standard.match(/(\d+)/);
+    const gradeNumber: string = gradeMatch ? gradeMatch[0] : 'Unknown';
+    const row = worksheet.getRow(i + 2);
+    const idCell = row.getCell(3);
+    const secondResponseCell = row.getCell(8);
+    const rowExists: boolean = idCell.value === generatedContent.id && !!secondResponseCell.value;
+    if (rowExists) {
+      continue;
+    }
+    const generatedContentData: SavedGeneratedContentData = JSON.parse(
+      generatedContent.content,
+    );
+    const includeUserInteractionHistory: boolean = false;
+    let selectedOption: AnswerOption | undefined;
+    if (includeUserInteractionHistory) {
+      selectedOption = generatedContentData.answer_options.find(
+        (answerOption: AnswerOption) => !answerOption.correct,
+      ) as AnswerOption;
+    } else {
+      selectedOption = {
+        id: '',
+        answer: '',
+        correct: false,
+        explanation: '',
+      }
+    }
+    const initialResponse: string = await generateResponse(
+      generatedContent,
+      selectedOption,
+    );
+    const userMessage: string =
+      USER_MESSAGES[Math.floor(Math.random() * USER_MESSAGES.length)];
+    const secondResponse: string = await generateResponse(
+      generatedContent, 
+      selectedOption,
+      userMessage,
+    );
+    const rowValues = [
+      gradeNumber,
+      generatedContent.standard,
+      generatedContent.id,
+      JSON.stringify(generatedContentData, null, 2),
+      selectedOption ? `${selectedOption.id}) ${selectedOption.answer}` : '-',
+      initialResponse,
+      userMessage,
+      secondResponse,
+    ];
+    worksheet.insertRow(i + 2, rowValues);
+    await workbook.xlsx.writeFile('output.xlsx');
+    console.log(`Processed ${i + 1} / ${generatedContentList.length}`);
+  }
+  return null;
+}
+
+/**
+ * Returns pre-generated content and/or triggers further generation of content to be served
+ *
+ * This is a convenience function to allow different recordViewAutomatically configuration
+ */
+export async function generateContentV2Impl(
+  event: ResolverInput<GenerateContentGraphQLInput>,
+  recordViewAutomatically: boolean
+): Promise<GeneratedContent> {
+  logger.info(`Generate content request: ${JSON.stringify(event.arguments)}`);
+
+  const generateContentGraphQLInput = GenerateContentInputGraphQLSchema.parse(event.arguments.input);
+  const generateInput = toGenerateContentInput(
+    generateContentGraphQLInput,
+    recordViewAutomatically,
+    event.identity?.claims || {}
+  );
+
+  // graphqlresolver lambda cannot make use of sharp for now, or any generation-dependencies
+  // so for now we have to make use of the generateContentWithAI lambda
+  if (generateContentGraphQLInput.isSyncGeneration) {
+    return await generateSyncContent(generateInput);
+  }
+
+  return await getOrGenerateContent(generateInput);
+}
+
+async function generateSyncContent(generateInput: GenerateContentInput): Promise<GeneratedContent> {
+  try {
+    const generatedContentList: GeneratedContent[] | { errorMessage: string, trace: string; } =
+      await new PrefillService().triggerSyncGeneration({
+        ...generateInput,
+        forceContentGeneration: true,
+      });
+    if (generatedContentList instanceof Array) {
+      return generatedContentList[0];
+    } else {
+      throw generatedContentList;
+    }
+  } catch (e) {
+    throw new Error(`Content unavailable right now. Please check back soon: ${JSON.stringify(e, null, 2)}`);
+  }
+}
+
+async function getOrGenerateContent(generateInput: GenerateContentInput): Promise<GeneratedContent> {
+  const configurationService = await ConfigurationService.getInstance();
+  const generatedContent = await new GeneratedContentService(configurationService).getContent(
+    generateInput,
+    generateInput.userId
+  );
+
+  if (!generatedContent) {
+    throw new Error('Content unavailable right now. Please check back soon.');
+  }
+
+  return generatedContent;
+}
+
+function toGenerateContentInput(
+  graphQLInput: GenerateContentGraphQLInput,
+  recordViewAutomatically: boolean,
+  claims: Record<string, string>
+): GenerateContentInput {
+  const currentUserId = claims['custom:userID'];
+  const currentRole = claims['custom:role'];
+  const currentStudentId =
+    currentRole === 'Admin' && graphQLInput.studentId ? graphQLInput.studentId : claims['custom:studentID'];
+
+  return {
+    ...graphQLInput,
+    userId: currentUserId,
+    studentId: currentStudentId,
+    extendedAttributes: graphQLInput.extendedAttributes?.map(({ platformId }) => ({
+      id: platformId,
+    })),
+    recordViewAutomatically,
+  } as GenerateContentInput;
+}

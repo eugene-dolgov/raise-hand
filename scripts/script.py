@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 engine = create_engine('mysql+pymysql://XXX:YYY@coachbot-prod-db.rp.devfactory.com/alphacoachbot')
 
 # Execute the query and save to JSON
-df = pd.read_sql("""SELECT cgc.id, s.external_id AS standard, cgc.content 
+df = pd.read_sql("""SELECT cgc.id, s.external_id AS standard, cgc.content, cgc.requested_context as context
 FROM content_gen_generated_content cgc
 JOIN standards s ON cgc.standard_id = s.id
 WHERE cgc.content_generator_config_id IN (
