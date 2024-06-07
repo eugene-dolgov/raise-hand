@@ -65,6 +65,10 @@ export class AppService {
     }
     for (let i = 0; i < generatedContentList.length; i++) {
       const generatedContent: GeneratedContent = generatedContentList[i];
+      const rowExists: boolean = worksheet.getRow(i + 2).getCell(1).value === generatedContent.id;
+      if (rowExists) {
+        continue;
+      }
       const generatedContentData: GeneratedContentData = JSON.parse(
         generatedContent.content,
       );
