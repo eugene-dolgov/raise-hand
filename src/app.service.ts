@@ -154,7 +154,7 @@ export class AppService {
       ) as AnswerOption;
       userInteractionHistory = USER_INTERACTION_HISTORY.replace(
         '{{selectedOption}}',
-        selectedOption.answer,
+        JSON.stringify(selectedOption.answer).slice(1, -1),
       );
     } else {
       userInteractionHistory = USER_INTERACTION_HISTORY.replace(
