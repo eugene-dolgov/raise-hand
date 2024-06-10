@@ -18,7 +18,7 @@ import {
   USER_INTERACTION_HISTORY,
 } from './mutations';
 
-const CHUNK_SIZE = 5;
+const CHUNK_SIZE = 20;
 
 const USER_MESSAGES: string[] = [
   'Can you assist me in solving this?',
@@ -76,7 +76,7 @@ export class AppService {
     );
     const entries: Array<[number, SavedGeneratedContent]> = Array.from(
       generatedContentMap.entries(),
-    );
+    ).reverse();
 
     for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
       const chunk: Array<[number, SavedGeneratedContent]> = entries.slice(
@@ -154,7 +154,7 @@ export class AppService {
       ) as AnswerOption;
       userInteractionHistory = USER_INTERACTION_HISTORY.replace(
         '{{selectedOption}}',
-        JSON.stringify(selectedOption.answer).slice(1, -1),
+        JSON.stringify(JSON.stringify(selectedOption.answer).slice(1, -1)).slice(1, -1),
       );
     } else {
       userInteractionHistory = USER_INTERACTION_HISTORY.replace(
