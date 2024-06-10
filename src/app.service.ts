@@ -19,6 +19,7 @@ import {
 } from './mutations';
 
 const CHUNK_SIZE = 20;
+const REPEATS_COUNT = 5;
 
 const USER_MESSAGES: string[] = [
   'Can you assist me in solving this?',
@@ -247,31 +248,37 @@ export class AppService {
       .replace('{{course}}', generatedContentContext.course)
       .replace('{{standardId}}', generatedContentContext.standardId);
 
-    try {
-      const response: AxiosResponse<GenerateContentResponse> =
-        await this.httpService
-          .post(
-            graphqlUrl,
-            { query: graphqlQuery },
-            { headers: { Authorization: graphqlIdToken } },
-          )
-          .toPromise();
+    for (let i = 0; i < REPEATS_COUNT; i++) {
+      try {
+        const response: AxiosResponse<GenerateContentResponse> =
+          await this.httpService
+            .post(
+              graphqlUrl,
+              { query: graphqlQuery },
+              { headers: { Authorization: graphqlIdToken } },
+            )
+            .toPromise();
 
-      if (response.data.errors) {
-        throw response.data.errors;
-      }
+        if (response.data.errors) {
+          throw response.data.errors;
+        }
 
-      const responseContent: GenerateContentV2Content = JSON.parse(
-        response.data.data.generateContentV2.content,
-      );
-      return responseContent.figureResponse.content;
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        console.error(error.response?.data);
-      } else {
-        console.error(error);
+        const responseContent: GenerateContentV2Content = JSON.parse(
+          response.data.data.generateContentV2.content,
+        );
+        return responseContent.figureResponse.content;
+      } catch (error) {
+        if (error instanceof AxiosError) {
+          console.error(error.response?.data);
+        } else {
+          console.error(error);
+        }
+        if (i < REPEATS_COUNT - 1) {
+          await new Promise(resolve => setTimeout(resolve, 10000));
+        } else {
+          throw error;
+        }
       }
-      throw error;
     }
   }
 }
